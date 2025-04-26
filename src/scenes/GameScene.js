@@ -171,13 +171,16 @@ export class GameScene extends Phaser.Scene {
   }
 
   spawnCoin() {
-    // Increment spawn count and determine if this is a special coin
+    // Increment spawn count (keeping this for potential future use)
     this.spawnCount++;
-    const isSpecial = this.spawnCount % 20 === 0;
     
     const { width, height } = this.scale;
     const y = Phaser.Math.Between(50, height - 50);
     const type = Phaser.Math.RND.pick(['coin1', 'coin2']);
+    
+    // Determine if this is a special coin based on type-specific chance
+    const specialChance = GAME_CONSTANTS.SPECIAL_COIN_CHANCE[type];
+    const isSpecial = Phaser.Math.RND.integerInRange(1, specialChance) === 1;
     
     const coin = this.coins.create(width + 50, y, type);
     coin.setVelocityX(-200);
