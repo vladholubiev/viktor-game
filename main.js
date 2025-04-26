@@ -40,7 +40,13 @@ class GameScene extends Phaser.Scene {
    * @param {{ startFlap?: boolean }} data
    */
   init(data) {
+    // Game start/restart parameters
     this.startFlap = data.startFlap;
+    // Reset coin spawn counter and special ticker state
+    this.spawnCount = 0;
+    this.specialTickerMessage = '';
+    this.specialTickerExpires = 0;
+    this.isShowingSpecialTicker = false;
   }
   create() {
     const { width, height } = this.scale;
@@ -66,12 +72,14 @@ class GameScene extends Phaser.Scene {
     this.input.on('pointerdown', () => this.player.setVelocityY(-300));
 
     // Coins group: no gravity, float horizontally
+    // Coins group: no gravity, float horizontally
     this.coins = this.physics.add.group({ allowGravity: false });
-    this.time.addEvent({ delay: 1000, callback: this.spawnCoin, callbackScope: this, loop: true });
+    this.coinTimer = this.time.addEvent({ delay: 1000, callback: this.spawnCoin, callbackScope: this, loop: true });
 
     // Bosses group: no gravity
+    // Bosses group: no gravity
     this.bosses = this.physics.add.group({ allowGravity: false });
-    this.time.addEvent({ delay: 10000, callback: this.spawnBoss, callbackScope: this, loop: true });
+    this.bossTimer = this.time.addEvent({ delay: 10000, callback: this.spawnBoss, callbackScope: this, loop: true });
 
     this.coinValueTotal = 0;
     this.multiplier = 1;
@@ -82,6 +90,43 @@ class GameScene extends Phaser.Scene {
 
     this.scoreText = this.add.text(10, 10, 'Wealth: 0', { font: '18px Arial', fill: '#ffffff' });
     this.coinsText = this.add.text(10, 30, 'Coins: 0', { font: '18px Arial', fill: '#ffffff' });
+    // Create the CNBC-style ticker
+    this.createTicker();
+  }
+
+  /** Create the scrolling CNBC-style ticker HUD */
+  createTicker() {
+    const { width } = this.scale;
+    this.defaultTickerSpeed = 100; // px/sec
+    this.tickerSpeed = this.defaultTickerSpeed;
+    this.tickerBG = this.add
+      .rectangle(0, 0, width, 30, 0x112244)
+      .setOrigin(0)
+      .setScrollFactor(0);
+    this.tickerText = this.add
+      .text(width, 15, '', {
+        font: 'bold 20px sans-serif',
+        fill: '#ffffff'
+      })
+      .setOrigin(0, 0.5)
+      .setScrollFactor(0);
+  }
+
+  /** Generate default ticker string with dynamic stats */
+  generateTickerString(wealth) {
+    const coins = this.coinValueTotal;
+    const growthPercent = ((this.multiplier - 1) * 100).toFixed(1);
+    const target = 10000;
+    let daysToFire = '∞';
+    if (wealth >= target) {
+      daysToFire = 0;
+    } else if (wealth > 0 && this.interestRate > 0) {
+      const seconds = Math.log(target / wealth) / this.interestRate;
+      const days = Math.ceil(seconds / 86400);
+      daysToFire = days > 0 ? days : 0;
+    }
+    const wealthStr = '$' + wealth.toLocaleString();
+    return `VIKTOR • Wealth: ${wealthStr} • Coins: ${coins} • Days to FIRE: ${daysToFire} • Compound Growth: +${growthPercent}%`;
   }
 
   update(_, delta) {
@@ -96,23 +141,50 @@ class GameScene extends Phaser.Scene {
     if (this.player.y > this.scale.height || this.player.y < 0) {
       this.scene.start('GameOverScene', { coins: this.coinValueTotal, wealth });
     }
+    // Ticker update: scroll or show special message
+    if (this.isShowingSpecialTicker && this.time.now > this.specialTickerExpires) {
+      this.isShowingSpecialTicker = false;
+      this.tickerSpeed = this.defaultTickerSpeed;
+      this.tickerText.x = this.scale.width;
+    }
+    const tickerContent = this.isShowingSpecialTicker
+      ? this.specialTickerMessage
+      : this.generateTickerString(wealth);
+    this.tickerText.setText(tickerContent);
+    this.tickerText.x -= this.tickerSpeed * (delta / 1000);
+    if (this.tickerText.x + this.tickerText.width < 0) {
+      this.tickerText.x = this.scale.width;
+    }
   }
 
   spawnCoin() {
+    // Increment spawn count and determine if this is a special coin
+    this.spawnCount++;
+    const isSpecial = this.spawnCount % 20 === 0;
     const { width, height } = this.scale;
     const y = Phaser.Math.Between(50, height - 50);
     const type = Phaser.Math.RND.pick(['coin1', 'coin2']);
     const coin = this.coins.create(width + 50, y, type);
     coin.setVelocityX(-200);
-    // Scale coin to ~8% of screen height and set collision circle
-    {
-      const img = this.textures.get(type).getSourceImage();
-      const coinScale = (this.scale.height * 0.08) / img.height;
-      coin.setScale(coinScale);
-      // Full sprite used for collision; no custom body shape
-    }
+    // Scale coin to ~8% of screen height
+    const img = this.textures.get(type).getSourceImage();
+    const coinScale = (this.scale.height * 0.08) / img.height;
+    coin.setScale(coinScale);
+    // Base coin data
     const value = type === 'coin1' ? 1 : 5;
     coin.setData('value', value);
+    coin.setData('special', isSpecial);
+    // Special coin effect: glowing/pulsing
+    if (isSpecial) {
+      coin.setTint(0xffff00);
+      this.tweens.add({
+        targets: coin,
+        scale: coinScale * 1.3,
+        duration: 500,
+        yoyo: true,
+        repeat: -1
+      });
+    }
   }
 
   spawnBoss() {
@@ -149,7 +221,30 @@ class GameScene extends Phaser.Scene {
         onComplete: () => explosion.destroy()
       });
     }
-    // Update score and remove coin
+    // Handle special "Good Investment" coin
+    if (coin.getData('special')) {
+      // Floating text overlay
+      const msg = this.add
+        .text(this.player.x, this.player.y - 50, 'GOOD INVESTMENT!', {
+          font: 'bold 24px Arial',
+          fill: '#00ff00'
+        })
+        .setOrigin(0.5);
+      this.tweens.add({
+        targets: msg,
+        y: msg.y - 50,
+        alpha: { from: 1, to: 0 },
+        duration: 1000,
+        onComplete: () => msg.destroy()
+      });
+      // Double current wealth multiplier
+      this.multiplier *= 2;
+      // Trigger special ticker message
+      this.specialTickerMessage = 'Good Investment! Wealth Doubled!';
+      this.specialTickerExpires = this.time.now + 3000;
+      this.isShowingSpecialTicker = true;
+    }
+    // Update principal and destroy coin
     this.coinValueTotal += coin.getData('value');
     coin.destroy();
   }
