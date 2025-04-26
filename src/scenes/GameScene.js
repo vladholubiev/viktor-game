@@ -195,15 +195,26 @@ export class GameScene extends Phaser.Scene {
     coin.setData('value', value);
     coin.setData('special', isSpecial);
     
-    // Special coin effect: glowing/pulsing
+    // Special coin effect: glowing/pulsing and spinning
     if (isSpecial) {
       coin.setTint(0xffff00);
+      
+      // Scale pulsing effect
       this.tweens.add({
         targets: coin,
         scale: coinScale * 1.3,
         duration: 500,
         yoyo: true,
         repeat: -1
+      });
+      
+      // Spinning rotation effect
+      this.tweens.add({
+        targets: coin,
+        angle: 360,
+        duration: 1500,
+        repeat: -1,
+        ease: 'Linear'
       });
     }
   }
@@ -255,11 +266,15 @@ export class GameScene extends Phaser.Scene {
       });
     }
     
-    // Handle special "Good Investment" coin
+    // Handle special coin
     if (coin.getData('special')) {
+      // Get coin type-specific message
+      const coinType = coin.texture.key;
+      const specialMessage = GAME_CONSTANTS.SPECIAL_COIN_MESSAGES[coinType];
+      
       // Floating text overlay
       const msg = this.add
-        .text(this.player.x, this.player.y - 50, 'GOOD\nINVESTMENT!', {
+        .text(this.player.x, this.player.y - 50, specialMessage, {
           font: 'bold 24px Arial',
           fill: '#00ff00',
           align: 'center'
@@ -270,15 +285,17 @@ export class GameScene extends Phaser.Scene {
         targets: msg,
         y: msg.y - 50,
         alpha: { from: 1, to: 0 },
-        duration: 1000,
+        duration: 2000, // Extended duration to 2 seconds
         onComplete: () => msg.destroy()
       });
       
       // Double current wealth multiplier
       this.multiplier *= 2;
       
-      // Trigger special ticker message
-      this.specialTickerMessage = 'Good Investment! Multiplier Doubled!';
+      // Update ticker message based on coin type
+      this.specialTickerMessage = coinType === 'coin1' ? 
+        'Good Investment! Multiplier Doubled!' : 
+        'Promotion! Multiplier Doubled!';
       this.specialTickerExpires = this.time.now + 3000;
       this.isShowingSpecialTicker = true;
     }
@@ -295,7 +312,27 @@ export class GameScene extends Phaser.Scene {
     // Debug
     console.log('Before update: wealth =', this.wealth, 'value =', coinValue, 'multiplier =', this.multiplier);
     
-    this.wealth += coinValue * this.multiplier;
+    // Calculate the value added to wealth
+    const valueAdded = coinValue * this.multiplier;
+    
+    // Display floating value text
+    const valueText = this.add
+      .text(this.player.x + 30, this.player.y, `+${valueAdded}`, {
+        font: 'bold 22px Arial',
+        fill: '#FFD700' // Gold color
+      })
+      .setOrigin(0.5);
+    
+    // Animate the floating value
+    this.tweens.add({
+      targets: valueText,
+      y: valueText.y - 40,
+      alpha: { from: 1, to: 0 },
+      duration: 1200,
+      onComplete: () => valueText.destroy()
+    });
+    
+    this.wealth += valueAdded;
     
     // Debug
     console.log('After update: wealth =', this.wealth);

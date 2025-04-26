@@ -30,5 +30,10 @@ export const GAME_CONSTANTS = {
   SPECIAL_COIN_CHANCE: {
     coin1: 10,  // 1 in 10 chance for cashflow coin to be special
     coin2: 15   // 1 in 15 chance for globallogic coin to be special
+  },
+  // Special coin messages
+  SPECIAL_COIN_MESSAGES: {
+    coin1: "GOOD\nINVESTMENT!",
+    coin2: "PROMOTION!"
   }
 };
