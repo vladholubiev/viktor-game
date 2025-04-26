@@ -93,9 +93,15 @@ class GameScene extends Phaser.Scene {
     this.bosses = this.physics.add.group({ allowGravity: false });
     this.bossTimer = this.time.addEvent({ delay: 10000, callback: this.spawnBoss, callbackScope: this, loop: true });
 
-    this.coinValueTotal = 0;
+    // Initialize game stats
+    this.wealth = 0;
+    this.coinsCollected = 0;
     this.multiplier = 1;
-    this.interestRate = 0.2; // per second
+    this.highestMultiplier = 1;
+    this.goal = 1000000000; // 1 billion goal
+    
+    // For debugging
+    console.log('Initial wealth:', this.wealth, 'type:', typeof this.wealth);
 
     this.physics.add.overlap(this.player, this.coins, this.collectCoin, null, this);
     this.physics.add.overlap(this.player, this.bosses, this.hitBoss, null, this);
@@ -127,34 +133,50 @@ class GameScene extends Phaser.Scene {
       .setScrollFactor(0);
   }
 
-  /** Generate default ticker string with dynamic stats */
-  generateTickerString(wealth) {
-    const coins = this.coinValueTotal;
-    const growthPercent = ((this.multiplier - 1) * 100).toFixed(1);
-    const target = 10000;
-    let daysToFire = '∞';
-    if (wealth >= target) {
-      daysToFire = 0;
-    } else if (wealth > 0 && this.interestRate > 0) {
-      const seconds = Math.log(target / wealth) / this.interestRate;
-      const days = Math.ceil(seconds / 86400);
-      daysToFire = days > 0 ? days : 0;
+  /** Format money values for display */
+  formatMoney(amount) {
+    if (amount >= 1e9) {
+      return '$' + (amount / 1e9).toFixed(2) + 'B';
+    } else if (amount >= 1e6) {
+      return '$' + (amount / 1e6).toFixed(2) + 'M';
+    } else {
+      return '$' + amount.toLocaleString();
     }
-    const wealthStr = '$' + wealth.toLocaleString();
-    return `VIKTOR • Wealth: ${wealthStr} • Coins: ${coins} • Days to FIRE: ${daysToFire} • Compound Growth: +${growthPercent}%`;
+  }
+
+  /** Generate default ticker string with dynamic stats */
+  generateTickerString() {
+    const wealth = this.wealth;
+    const toGoal = Math.max(this.goal - wealth, 0);
+    const coins = this.coinsCollected;
+    const multiplier = this.multiplier;
+    const multiplierStr = Number.isInteger(multiplier) ? multiplier : multiplier.toFixed(2);
+    const wealthStr = this.formatMoney(wealth);
+    const toGoalStr = this.formatMoney(toGoal);
+    return `VIKTOR • Wealth: ${wealthStr} • To Goal: ${toGoalStr} • Coins: ${coins} • Multiplier: x${multiplierStr}`;
   }
 
   update(_, delta) {
-    this.multiplier *= 1 + this.interestRate * (delta / 1000);
-    const wealth = Math.floor(this.coinValueTotal * this.multiplier);
-    this.scoreText.setText('Wealth: ' + wealth);
-    this.coinsText.setText('Coins: ' + this.coinValueTotal);
+    // Update HUD
+    this.scoreText.setText('Wealth: ' + this.formatMoney(this.wealth));
+    this.coinsText.setText('Coins: ' + this.coinsCollected);
 
     this.coins.children.each(c => { if (c.x < -c.width) c.destroy(); });
     this.bosses.children.each(b => { if (b.x < -b.width) b.destroy(); });
 
+    // Check out-of-bounds: game over
     if (this.player.y > this.scale.height || this.player.y < 0) {
-      this.scene.start('GameOverScene', { coins: this.coinValueTotal, wealth });
+      this.physics.pause();
+      this.coinTimer.paused = true;
+      this.bossTimer.paused = true;
+      this.input.off('pointerdown');
+      this.scene.start('GameOverScene', {
+        coins: this.coinsCollected,
+        wealth: this.wealth,
+        highestMultiplier: this.highestMultiplier,
+        goalReached: false,
+        goal: this.goal
+      });
     }
     // Ticker update: scroll or show special message
     if (this.isShowingSpecialTicker && this.time.now > this.specialTickerExpires) {
@@ -164,7 +186,7 @@ class GameScene extends Phaser.Scene {
     }
     const tickerContent = this.isShowingSpecialTicker
       ? this.specialTickerMessage
-      : this.generateTickerString(wealth);
+      : this.generateTickerString();
     this.tickerText.setText(tickerContent);
     this.tickerText.x -= this.tickerSpeed * (delta / 1000);
     if (this.tickerText.x + this.tickerText.width < 0) {
@@ -261,13 +283,43 @@ class GameScene extends Phaser.Scene {
       // Double current wealth multiplier
       this.multiplier *= 2;
       // Trigger special ticker message
-      this.specialTickerMessage = 'Good Investment! Wealth Doubled!';
+      this.specialTickerMessage = 'Good Investment! Multiplier Doubled!';
       this.specialTickerExpires = this.time.now + 3000;
       this.isShowingSpecialTicker = true;
     }
-    // Update principal and destroy coin
-    this.coinValueTotal += coin.getData('value');
+    // Get coin value before destroying it
+    const coinValue = coin.getData('value');
+    
+    // Now destroy the coin
     coin.destroy();
+    
+    // Update stats: coins collected and wealth
+    this.coinsCollected++;
+    
+    // Debug
+    console.log('Before update: wealth =', this.wealth, 'value =', coinValue, 'multiplier =', this.multiplier);
+    
+    this.wealth += coinValue * this.multiplier;
+    
+    // Debug
+    console.log('After update: wealth =', this.wealth);
+    // Check win condition
+    if (this.wealth >= this.goal) {
+      this.physics.pause();
+      this.coinTimer.paused = true;
+      this.bossTimer.paused = true;
+      this.input.off('pointerdown');
+      this.tickerSpeed = 0;
+      this.time.delayedCall(1000, () => {
+        this.scene.start('GameOverScene', {
+          coins: this.coinsCollected,
+          wealth: this.wealth,
+          highestMultiplier: this.highestMultiplier,
+          goalReached: true,
+          goal: this.goal
+        });
+      });
+    }
   }
 
   hitBoss(player, boss) {
@@ -290,10 +342,15 @@ class GameScene extends Phaser.Scene {
     });
     // Halt ticker
     this.tickerSpeed = 0;
-    // Delay then go to Game Over
+    // Delay then show Game Over summary
     this.time.delayedCall(2000, () => {
-      const wealth = Math.floor(this.coinValueTotal * this.multiplier);
-      this.scene.start('GameOverScene', { coins: this.coinValueTotal, wealth });
+      this.scene.start('GameOverScene', {
+        coins: this.coinsCollected,
+        wealth: this.wealth,
+        highestMultiplier: this.highestMultiplier,
+        goalReached: false,
+        goal: this.goal
+      });
     });
   }
 }
@@ -301,22 +358,48 @@ class GameScene extends Phaser.Scene {
 class GameOverScene extends Phaser.Scene {
   constructor() { super('GameOverScene'); }
   init(data) { this.stats = data; }
+  /** Format money values for display */
+  formatMoney(amount) {
+    if (amount >= 1e9) {
+      return '$' + (amount / 1e9).toFixed(2) + 'B';
+    } else if (amount >= 1e6) {
+      return '$' + (amount / 1e6).toFixed(2) + 'M';
+    } else {
+      return '$' + amount.toLocaleString();
+    }
+  }
   create() {
     // Stop background music and play game over sound
     this.sound.stopAll();
     this.sound.play('game_over');
     const { width, height } = this.scale;
+    // Title
+    const title = this.stats.goalReached ? 'Victory!' : 'Game Over';
+    const titleColor = this.stats.goalReached ? '#00ff00' : '#ff0000';
     this.add
-      .text(width / 2, height / 3, 'Game Over', { font: '48px Arial', fill: '#ff0000' })
+      .text(width / 2, height / 4, title, { font: '48px Arial', fill: titleColor })
+      .setOrigin(0.5);
+    // Summary stats
+    const startY = height / 2 - 60;
+    const lineSpacing = 30;
+    this.add
+      .text(width / 2, startY, `Final Wealth: ${this.formatMoney(this.stats.wealth)}`, { font: '24px Arial', fill: '#ffffff' })
+      .setOrigin(0.5);
+    const toGoal = Math.max(this.stats.goal - this.stats.wealth, 0);
+    this.add
+      .text(width / 2, startY + lineSpacing, `To Goal: ${this.formatMoney(toGoal)}`, { font: '24px Arial', fill: '#ffffff' })
       .setOrigin(0.5);
     this.add
-      .text(width / 2, height / 2, `Coins: ${this.stats.coins}`, { font: '24px Arial', fill: '#ffffff' })
+      .text(width / 2, startY + lineSpacing * 2, `Coins Collected: ${this.stats.coins}`, { font: '24px Arial', fill: '#ffffff' })
       .setOrigin(0.5);
+    const mult = this.stats.highestMultiplier;
+    const multStr = Number.isInteger(mult) ? mult : mult.toFixed(2);
     this.add
-      .text(width / 2, height / 2 + 30, `Wealth: ${this.stats.wealth}`, { font: '24px Arial', fill: '#ffffff' })
+      .text(width / 2, startY + lineSpacing * 3, `Highest Multiplier: x${multStr}`, { font: '24px Arial', fill: '#ffffff' })
       .setOrigin(0.5);
+    // Restart prompt
     this.add
-      .text(width / 2, (height * 2) / 3, 'Tap to Restart', { font: '18px Arial', fill: '#ffff00' })
+      .text(width / 2, height * 3 / 4, 'Tap to Restart', { font: '18px Arial', fill: '#ffff00' })
       .setOrigin(0.5);
     this.input.once('pointerdown', () => this.scene.start('GameScene', { startFlap: true }));
   }
