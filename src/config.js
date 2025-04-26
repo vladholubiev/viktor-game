@@ -1,6 +1,8 @@
 // Game configuration
 export const gameConfig = {
   type: Phaser.AUTO,
+  // Render at native resolution on high-DPI/Retina screens
+  resolution: window.devicePixelRatio,
   scale: {
     parent: 'game-container',
     mode: Phaser.Scale.RESIZE,
