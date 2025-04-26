@@ -188,7 +188,7 @@ export class GameScene extends Phaser.Scene {
     coin.setScale(coinScale);
     
     // Base coin data
-    const value = type === 'coin1' ? 1 : 5;
+    const value = GAME_CONSTANTS.COIN_VALUES[type];
     coin.setData('value', value);
     coin.setData('special', isSpecial);
     

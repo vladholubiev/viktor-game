@@ -20,5 +20,10 @@ export const GAME_CONSTANTS = {
   DEFAULT_TICKER_SPEED: 100, // px/sec
   COIN_SPAWN_INTERVAL: 1000, // ms
   BOSS_SPAWN_INTERVAL: 10000, // ms
-  PLAYER_JUMP_VELOCITY: -300
+  PLAYER_JUMP_VELOCITY: -300,
+  // Coin values
+  COIN_VALUES: {
+    coin1: 10,  // cashflow coin value
+    coin2: 20   // globallogic coin value
+  }
 };

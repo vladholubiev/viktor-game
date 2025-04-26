@@ -1,5 +1,16 @@
 // Main game logic for Flappy Viktor – Compound Cashflow Game
 
+// Game config constants
+const GAME_CONFIG = {
+  // Coin values
+  COIN_VALUES: {
+    coin1: 1,  // cashflow coin value
+    coin2: 5   // globallogic coin value
+  },
+  // Game goal
+  GOAL: 1000000000 // 1 billion goal
+};
+
 class BootScene extends Phaser.Scene {
   constructor() { super('BootScene'); }
   preload() {
@@ -98,7 +109,7 @@ class GameScene extends Phaser.Scene {
     this.coinsCollected = 0;
     this.multiplier = 1;
     this.highestMultiplier = 1;
-    this.goal = 1000000000; // 1 billion goal
+    this.goal = GAME_CONFIG.GOAL;
     
     // For debugging
     console.log('Initial wealth:', this.wealth, 'type:', typeof this.wealth);
@@ -208,7 +219,7 @@ class GameScene extends Phaser.Scene {
     const coinScale = (this.scale.height * 0.08) / img.height;
     coin.setScale(coinScale);
     // Base coin data
-    const value = type === 'coin1' ? 1 : 5;
+    const value = GAME_CONFIG.COIN_VALUES[type];
     coin.setData('value', value);
     coin.setData('special', isSpecial);
     // Special coin effect: glowing/pulsing
