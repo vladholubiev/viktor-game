@@ -8,7 +8,9 @@
     - `ibrahimovic_boss.png` (boss)
     - `background.png` (scenery)
     - `cashflow_coin.png` (coin type 1)
-    - `globallogic_coin.png` (coin type 2)
+   - `globallogic_coin.png` (coin type 2)
+   - `cashflow_coin_explosion.png` (coin type 1 explosion)
+   - `globallogic_coin_explosion.png` (coin type 2 explosion)
  2. Open `index.html` in your browser. For local testing, you can run a static server. For example:
     ```bash
     npx serve .

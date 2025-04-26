@@ -8,6 +8,9 @@ class BootScene extends Phaser.Scene {
     this.load.image('coin1', 'game_assets/cashflow_coin.png');
     this.load.image('coin2', 'game_assets/globallogic_coin.png');
     this.load.image('boss', 'game_assets/ibrahimovic_boss.png');
+    // Coin explosion effects
+    this.load.image('coin1Explode', 'game_assets/cashflow_coin_explosion.png');
+    this.load.image('coin2Explode', 'game_assets/globallogic_coin_explosion.png');
   }
   create() {
     this.scene.start('TitleScene');
@@ -53,7 +56,7 @@ class GameScene extends Phaser.Scene {
       const img = this.textures.get('viktor').getSourceImage();
       const scale = (height * 0.15) / img.height;
       this.player.setScale(scale);
-      this.player.setCircle((img.width * scale) / 2);
+      // Full sprite used for collision; no custom body shape
     }
     // Initial flap if started with tap from title/restart
     if (this.startFlap) {
@@ -106,7 +109,7 @@ class GameScene extends Phaser.Scene {
       const img = this.textures.get(type).getSourceImage();
       const coinScale = (this.scale.height * 0.08) / img.height;
       coin.setScale(coinScale);
-      coin.setCircle((img.width * coinScale) / 2);
+      // Full sprite used for collision; no custom body shape
     }
     const value = type === 'coin1' ? 1 : 5;
     coin.setData('value', value);
@@ -121,12 +124,32 @@ class GameScene extends Phaser.Scene {
       const img = this.textures.get('boss').getSourceImage();
       const bossScale = (this.scale.height * 0.2) / img.height;
       boss.setScale(bossScale);
-      boss.setCircle((img.width * bossScale) / 2);
+      // Full sprite used for collision; no custom body shape
     }
     boss.setVelocityX(-250);
   }
 
   collectCoin(_, coin) {
+    // Spawn explosion effect at coin position
+    const x = coin.x;
+    const y = coin.y;
+    const type = coin.texture.key;
+    const explosionKey = type === 'coin1' ? 'coin1Explode' : 'coin2Explode';
+    const explosion = this.add.sprite(x, y, explosionKey);
+    // Scale and animate explosion
+    {
+      const img = this.textures.get(explosionKey).getSourceImage();
+      const expScale = (this.scale.height * 0.08) / img.height;
+      explosion.setScale(expScale);
+      this.tweens.add({
+        targets: explosion,
+        alpha: { from: 1, to: 0 },
+        scale: expScale * 1.5,
+        duration: 300,
+        onComplete: () => explosion.destroy()
+      });
+    }
+    // Update score and remove coin
     this.coinValueTotal += coin.getData('value');
     coin.destroy();
   }
