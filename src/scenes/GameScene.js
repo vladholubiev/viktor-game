@@ -12,6 +12,13 @@ export class GameScene extends Phaser.Scene {
   init(data) {
     // Game start/restart parameters
     this.startFlap = data.startFlap;
+    // Initialize or restore lives
+    this.lives = data.lives !== undefined ? data.lives : GAME_CONSTANTS.STARTING_LIVES;
+    // Initialize or restore game stats
+    this.wealth = data.wealth !== undefined ? data.wealth : 0;
+    this.coinsCollected = data.coinsCollected !== undefined ? data.coinsCollected : 0;
+    this.multiplier = data.multiplier !== undefined ? data.multiplier : 1;
+    this.highestMultiplier = data.highestMultiplier !== undefined ? data.highestMultiplier : 1;
     // Reset coin spawn counter and special ticker state
     this.spawnCount = 0;
     this.specialTickerMessage = '';
@@ -68,11 +75,7 @@ export class GameScene extends Phaser.Scene {
       loop: true 
     });
 
-    // Initialize game stats
-    this.wealth = 0;
-    this.coinsCollected = 0;
-    this.multiplier = 1;
-    this.highestMultiplier = 1;
+    // Initialize goal
     this.goal = GAME_CONSTANTS.GOAL;
     
     // For debugging
@@ -86,6 +89,9 @@ export class GameScene extends Phaser.Scene {
     this.scoreText = this.add.text(10, 10, 'Wealth: 0', { font: '18px Arial', fill: '#ffffff' });
     this.coinsText = this.add.text(10, 30, 'Coins: 0', { font: '18px Arial', fill: '#ffffff' });
     
+    // Create lives display
+    this.createLivesDisplay();
+    
     // Create the CNBC-style ticker
     this.createTicker();
     
@@ -94,6 +100,34 @@ export class GameScene extends Phaser.Scene {
     this.bgMusic.play();
   }
 
+  /** Create lives display with heart icons */
+  createLivesDisplay() {
+    const { width } = this.scale;
+    this.livesGroup = this.add.group();
+    
+    // Create heart sprites for each life
+    this.updateLivesDisplay();
+  }
+  
+  /** Update the lives display based on current lives */
+  updateLivesDisplay() {
+    // Clear existing hearts
+    this.livesGroup.clear(true, true);
+    
+    // Create new hearts based on current lives
+    for (let i = 0; i < this.lives; i++) {
+      const heart = this.add.image(this.scale.width - 30 - (i * 35), 50, 'heart');
+      
+      // Scale heart to appropriate size
+      const img = this.textures.get('heart').getSourceImage();
+      const heartScale = 35 / img.height;
+      heart.setScale(heartScale);
+      
+      // Add to group for easier management
+      this.livesGroup.add(heart);
+    }
+  }
+  
   /** Create the scrolling CNBC-style ticker HUD */
   createTicker() {
     const { width } = this.scale;
@@ -147,8 +181,14 @@ export class GameScene extends Phaser.Scene {
         wealth: this.wealth,
         highestMultiplier: this.highestMultiplier,
         goalReached: false,
-        goal: this.goal
+        goal: this.goal,
+        lives: 0 // Out of bounds means all lives lost
       });
+    }
+    
+    // Update lives display if it changed
+    if (this.livesGroup && this.livesGroup.getLength() !== this.lives) {
+      this.updateLivesDisplay();
     }
     
     // Ticker update: scroll or show special message
@@ -362,7 +402,8 @@ export class GameScene extends Phaser.Scene {
           wealth: this.wealth,
           highestMultiplier: this.highestMultiplier,
           goalReached: true,
-          goal: this.goal
+          goal: this.goal,
+          lives: this.lives
         });
       });
     }
@@ -393,15 +434,56 @@ export class GameScene extends Phaser.Scene {
     // Halt ticker
     this.tickerSpeed = 0;
     
-    // Delay then show Game Over summary
+    // Reduce lives
+    this.lives--;
+    
+    // Delay then show Game Over or continue
     this.time.delayedCall(2000, () => {
-      this.scene.start('GameOverScene', {
-        coins: this.coinsCollected,
-        wealth: this.wealth,
-        highestMultiplier: this.highestMultiplier,
-        goalReached: false,
-        goal: this.goal
-      });
+      if (this.lives > 0) {
+        // Update highest multiplier if current is higher
+        this.highestMultiplier = Math.max(this.highestMultiplier, this.multiplier);
+        
+        // Show lives remaining and prompt
+        const { width, height } = this.scale;
+        const livesText = this.add.text(width / 2, height / 2 - 60, 
+          `${this.lives} ${this.lives === 1 ? 'life' : 'lives'} remaining`, 
+          { font: '32px Arial', fill: '#ff0000', stroke: '#000000', strokeThickness: 4 }
+        ).setOrigin(0.5);
+        
+        const tapText = this.add.text(width / 2, height / 2, 
+          'Tap to proceed', 
+          { font: '24px Arial', fill: '#ffffff', stroke: '#000000', strokeThickness: 3 }
+        ).setOrigin(0.5);
+        
+        // Wait for tap to continue
+        const continueHandler = () => {
+          this.input.off('pointerdown', continueHandler);
+          livesText.destroy();
+          tapText.destroy();
+          
+          // Resume the game with remaining lives but keep progress
+          this.scene.restart({
+            startFlap: true,
+            lives: this.lives,
+            wealth: this.wealth,
+            coinsCollected: this.coinsCollected,
+            multiplier: this.multiplier,
+            highestMultiplier: this.highestMultiplier
+          });
+        };
+        
+        this.input.on('pointerdown', continueHandler);
+      } else {
+        // No lives left - game over
+        this.scene.start('GameOverScene', {
+          coins: this.coinsCollected,
+          wealth: this.wealth,
+          highestMultiplier: this.highestMultiplier,
+          goalReached: false,
+          goal: this.goal,
+          lives: this.lives
+        });
+      }
     });
   }
 }

@@ -21,6 +21,7 @@ export const GAME_CONSTANTS = {
   COIN_SPAWN_INTERVAL: 1000, // ms
   BOSS_SPAWN_INTERVAL: 10000, // ms
   PLAYER_JUMP_VELOCITY: -300,
+  STARTING_LIVES: 3, // Player starts with 3 lives
   // Coin values
   COIN_VALUES: {
     coin1: 10,  // cashflow coin value

@@ -12,6 +12,7 @@ export class BootScene extends Phaser.Scene {
     // Coin explosion effects
     this.load.image('coin1Explode', 'game_assets/cashflow_coin_explosion.png');
     this.load.image('coin2Explode', 'game_assets/globallogic_coin_explosion.png');
+    this.load.image('heart', 'game_assets/heart.png');
     // Audio assets
     this.load.audio('bgm', 'game_assets/background.mp3');
     this.load.audio('coin_regular', 'game_assets/coin_regular.mp3');

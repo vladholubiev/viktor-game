@@ -46,6 +46,18 @@ export class GameOverScene extends Phaser.Scene {
     this.add
       .text(width / 2, startY + lineSpacing * 3, `Highest Multiplier: x${multStr}`, { font: '24px Arial', fill: '#ffffff' })
       .setOrigin(0.5);
+      
+    // Display lives info if present
+    if (this.stats.lives !== undefined) {
+      const livesText = this.stats.lives > 0 
+        ? `Lives Remaining: ${this.stats.lives}`
+        : 'No Lives Remaining';
+      const livesColor = this.stats.lives > 0 ? '#00ff00' : '#ff0000';
+      
+      this.add
+        .text(width / 2, startY + lineSpacing * 4, livesText, { font: '24px Arial', fill: livesColor })
+        .setOrigin(0.5);
+    }
     
     // Restart prompt
     this.add
