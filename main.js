@@ -11,6 +11,12 @@ class BootScene extends Phaser.Scene {
     // Coin explosion effects
     this.load.image('coin1Explode', 'game_assets/cashflow_coin_explosion.png');
     this.load.image('coin2Explode', 'game_assets/globallogic_coin_explosion.png');
+    // Audio assets
+    this.load.audio('bgm', 'game_assets/background.mp3');
+    this.load.audio('coin_regular', 'game_assets/coin_regular.mp3');
+    this.load.audio('coin_special', 'game_assets/coin_special.mp3');
+    this.load.audio('boss_hit', 'game_assets/boss_hit.mp3');
+    this.load.audio('game_over', 'game_assets/game_over.mp3');
   }
   create() {
     this.scene.start('TitleScene');
@@ -30,7 +36,13 @@ class TitleScene extends Phaser.Scene {
     this.add
       .text(width / 2, (height * 2) / 3, 'Tap to Start', { font: '18px Arial', fill: '#ffff00' })
       .setOrigin(0.5);
-    this.input.once('pointerdown', () => this.scene.start('GameScene', { startFlap: true }));
+    this.input.once('pointerdown', () => {
+      // Unlock audio context on mobile browsers if suspended
+      if (this.sound.context && this.sound.context.state === 'suspended') {
+        this.sound.context.resume();
+      }
+      this.scene.start('GameScene', { startFlap: true });
+    });
   }
 }
 
@@ -92,6 +104,9 @@ class GameScene extends Phaser.Scene {
     this.coinsText = this.add.text(10, 30, 'Coins: 0', { font: '18px Arial', fill: '#ffffff' });
     // Create the CNBC-style ticker
     this.createTicker();
+    // Play background music
+    this.bgMusic = this.sound.add('bgm', { loop: true });
+    this.bgMusic.play();
   }
 
   /** Create the scrolling CNBC-style ticker HUD */
@@ -202,6 +217,12 @@ class GameScene extends Phaser.Scene {
   }
 
   collectCoin(_, coin) {
+    // Play coin collection sound
+    if (coin.getData('special')) {
+      this.sound.play('coin_special');
+    } else {
+      this.sound.play('coin_regular');
+    }
     // Spawn explosion effect at coin position
     const x = coin.x;
     const y = coin.y;
@@ -250,6 +271,8 @@ class GameScene extends Phaser.Scene {
   }
 
   hitBoss(player, boss) {
+    // Play boss hit sound effect
+    this.sound.play('boss_hit');
     // Pause physics and timers
     this.physics.pause();
     this.coinTimer.paused = true;
@@ -279,6 +302,9 @@ class GameOverScene extends Phaser.Scene {
   constructor() { super('GameOverScene'); }
   init(data) { this.stats = data; }
   create() {
+    // Stop background music and play game over sound
+    this.sound.stopAll();
+    this.sound.play('game_over');
     const { width, height } = this.scale;
     this.add
       .text(width / 2, height / 3, 'Game Over', { font: '48px Arial', fill: '#ff0000' })
