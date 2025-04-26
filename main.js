@@ -249,9 +249,29 @@ class GameScene extends Phaser.Scene {
     coin.destroy();
   }
 
-  hitBoss() {
-    const wealth = Math.floor(this.coinValueTotal * this.multiplier);
-    this.scene.start('GameOverScene', { coins: this.coinValueTotal, wealth });
+  hitBoss(player, boss) {
+    // Pause physics and timers
+    this.physics.pause();
+    this.coinTimer.paused = true;
+    this.bossTimer.paused = true;
+    this.input.off('pointerdown');
+    // Boss glow red
+    boss.setTint(0xff0000);
+    // Boss pulsing red glow effect
+    this.tweens.add({
+      targets: boss,
+      alpha: { from: 1, to: 0.4 },
+      yoyo: true,
+      repeat: 5,
+      duration: 200
+    });
+    // Halt ticker
+    this.tickerSpeed = 0;
+    // Delay then go to Game Over
+    this.time.delayedCall(2000, () => {
+      const wealth = Math.floor(this.coinValueTotal * this.multiplier);
+      this.scene.start('GameOverScene', { coins: this.coinValueTotal, wealth });
+    });
   }
 }
 
