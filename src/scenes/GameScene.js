@@ -32,12 +32,12 @@ export class GameScene extends Phaser.Scene {
     this.player = this.physics.add.sprite(width * 0.2, height / 2, 'viktor')
       .setCollideWorldBounds(true);
     
-    // Scale player to ~15% of screen height and set collision circle
+    // Scale player to ~15% of screen height
     {
       const img = this.textures.get('viktor').getSourceImage();
       const scale = (height * 0.15) / img.height;
       this.player.setScale(scale);
-      // Full sprite used for collision; no custom body shape
+      // Using full sprite for collision to make collecting coins easier
     }
     
     // Initial flap if started with tap from title/restart
@@ -230,7 +230,18 @@ export class GameScene extends Phaser.Scene {
       const img = this.textures.get('boss').getSourceImage();
       const bossScale = (this.scale.height * 0.2) / img.height;
       boss.setScale(bossScale);
-      // Full sprite used for collision; no custom body shape
+      
+      // Create a much smaller hitbox (40% of visual size)
+      // This makes the collision detection more precise and boss harder to hit
+      const bodyWidth = img.width * bossScale * 0.4;
+      const bodyHeight = img.height * bossScale * 0.4;
+      
+      // Center the hitbox in the sprite
+      const offsetX = (img.width * bossScale - bodyWidth) / 2;
+      const offsetY = (img.height * bossScale - bodyHeight) / 2;
+      
+      boss.body.setSize(bodyWidth, bodyHeight);
+      boss.body.setOffset(offsetX, offsetY);
     }
     
     boss.setVelocityX(-250);
