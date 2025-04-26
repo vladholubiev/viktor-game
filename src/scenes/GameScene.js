@@ -259,9 +259,10 @@ export class GameScene extends Phaser.Scene {
     if (coin.getData('special')) {
       // Floating text overlay
       const msg = this.add
-        .text(this.player.x, this.player.y - 50, 'GOOD INVESTMENT!', {
+        .text(this.player.x, this.player.y - 50, 'GOOD\nINVESTMENT!', {
           font: 'bold 24px Arial',
-          fill: '#00ff00'
+          fill: '#00ff00',
+          align: 'center'
         })
         .setOrigin(0.5);
       
